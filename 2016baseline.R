@@ -32,10 +32,10 @@ source("C:/Users/nadecovich/Documents/R/Functions.GCL.r")
 
 #
 species <- "chum"
-markersuite <- "WAK_Chum_192SNPs"
+markersuite <- "ChumGolden2011_96SNPs"
 
-project <- "CM045"
-projectID <- 2210
+##project <- "CM045"
+##projectID <- 2210
 
 username <- "nadecovich"
 password <- "Terje0623*"
@@ -43,6 +43,21 @@ CreateLocusControl.GCL(markersuite = markersuite, username = username, password 
 
 # Read in Project data
 ReadProjectLOKI2R.GCL(projectID = projectID, username = username, password = password)
+
+# Verify SILLYs imported
+objects(pattern = "\\.gcl")
+
+# Create a list of project sillys
+ProjectSillys <- unlist(strsplit(objects(pattern = "\\.gcl"),  split = "\\.gcl"))
+
+
+
+ProjectSillys  <- scan("clipboard",what='')
+
+LOKI2R.GCL(sillyvec = ProjectSillys, username = username, password = password)
+
+
+
 
 # Verify SILLYs imported
 objects(pattern = "\\.gcl")
@@ -64,12 +79,6 @@ loci182 <- loci[-c(22,30,35,42,43,51,61,72,104,116)]
 ### Narrow to only list of project sillies
 ProjectSillys <- scan("clipboard",what='')
 
-### Group vec for project sillies
-
-GroupVec42  <- scan("clipboard",what='')
-GroupVec42  <- as.numeric(GroupVec42)
-GroupNames7 <- scan("clipboard",what='')
-Group7Colors <- scan("clipboard",what='')
 
 
 #Create folders
@@ -91,7 +100,7 @@ for (x in Mixtures){
   dir.create(dir)}
 
 #Dump .gcl objects for safe keeping
-dump(paste(ProjectSillys ,".gcl",sep=''),"Output/WASC.gcl_objects.txt")
+dump(paste(ProjectSillys ,".gcl",sep=''),"Output/Yukon2016.gcl_objects.txt")
 
 
 #Check sample sizes before removing individuals with >20% missing locus scores.
@@ -108,8 +117,6 @@ write.table(ColSize2,file= "Output/ColSizePostMissLoci.xls",sep="\t", col.names=
 dupcheck<-CheckDupWithinSilly.GCL(sillyvec=ProjectSillys,loci=loci,quantile=NULL,minproportion=0.95)
 
 
-##Paste duplicate info here
-Check dup check object for dups. Nothing removed as of 2/29/16. Will revisit
 
 #Remove duplicate individuals
 removedDups<-RemoveDups.GCL(dupcheck)
@@ -123,6 +130,12 @@ unlist(removedDups[!removedDups=="Nothing Removed"])#Gets the individuals remove
 ColSizePostDup <- sapply(paste(ProjectSillys,".gcl",sep=''), function(x) get(x)$n)
 write.table(ColSizePostDup,file= "Output/ColSizePostDup.xls",sep="\t", col.names=NA, row.names=T)
 
+## Create new locus list based on linkage work done in WASSIP and 2013 Yukon analysis
+
+### Keep Oke_pgap-111 (drop Oke_pgap-92)
+### Keep Oke_gdh1-191 (drop Oke_gdh1-62)
+### Drop mtDNA
+loci.91 <- LocusControl$locusnames[-c(14,15,24,38,41)]
 
 ## generate GENEPOP format data file for HWE and Linkage check
 gcl2Genepop.GCL(sillyvec=ProjectSillys,loci=DipLoci,path="V:/Analysis/3_AYK/Chum/WASC/Genepop/WASCchum",VialNums = FALSE)
@@ -131,7 +144,7 @@ HWE=ReadGenepopHWE.GCL(file="V:/Analysis/3_AYK/Chum/WASC/Genepop/WASCchum.P")
 write.table((HWE$SummaryPValues),"Output/HWEprepooling.xls",sep='\t',col.names=NA, row.names=T)
 
 ## Dump allele 2 frequencies
-AlleleCounts <- FreqPop.GCL(sillyvec=ProjectSillys,loci=loci182)
+AlleleCounts <- FreqPop.GCL(sillyvec=ProjectSillys,loci=loci.91)
 str(AlleleCounts)
 Freqs <- AlleleCounts[,,"Allele 2"]/(AlleleCounts[,,"Allele 2"]
                                      + AlleleCounts[,,"Allele 1"])
@@ -140,18 +153,31 @@ write.table(Freqs,"Output/frequencies.xls",sep='\t',col.names=NA, row.names=T)
 
 ## Use Fishers test to check homogeneity of temporal samples before pooling
 ## Check temporal colletions for pooling
-TemporalTest1=list(ProjectSillys[11:12],
-                   ProjectSillys[14:16],
-                   ProjectSillys[18:19],
-                   ProjectSillys[21:22],
-                   ProjectSillys[29:30],
-                   ProjectSillys[31:32],
-                   ProjectSillys[35:37],
-                   ProjectSillys[38:39])
+TemporalTest=list(ProjectSillys[3:4],
+                  ProjectSillys[9:13],
+                  ProjectSillys[16:17],
+                  ProjectSillys[26:28],
+                  ProjectSillys[29:32],
+                  ProjectSillys[33:35],
+                  ProjectSillys[38:39])
+                  
 
 
-FisherTemporalResults <- FishersTest.GCL(freq=AlleleCounts, loci=loci182,tests=TemporalTest1)
-sink(file="Output/FisherTemporalResults.xls")
+TemporalTest2=list(ProjectSillys[42:44],
+                  ProjectSillys[45:47],
+                  ProjectSillys[52:53],
+                  ProjectSillys[55:56],
+                  ProjectSillys[58:63],
+                  ProjectSillys[65:67],
+                  ProjectSillys[70:71],
+                  ProjectSillys[72:73],
+                  ProjectSillys[74:75]
+)
+
+
+
+FisherTemporalResults <- FishersTest.GCL(freq=AlleleCounts, loci=loci.91,tests=TemporalTest2)
+sink(file="Output/FisherTemporalResults2.xls")
 print(FisherTemporalResults)
 sink()
 
@@ -159,17 +185,20 @@ sink()
 
 ## 
 
-lapply(1:length(TemporalTest1),function(x){PoolCollections.GCL(TemporalTest1[[x]], loci=loci182, IDs = NULL,
-                                                               newname = paste(TemporalTest1[[x]],collapse = "."))})
+lapply(1:length(TemporalTest2),function(x){PoolCollections.GCL(TemporalTest2[[x]], loci=loci, IDs = NULL,
+                                                               newname = paste(TemporalTest2[[x]],collapse = "."))})
 
+##Forgot to do Tatchun
+PoolCollections.GCL(collections = ProjectSillys[c(72:73)], loci=loci, IDs = NULL,
+                    newname = paste(ProjectSillys[c(72:73)],collapse = "."))
 
 ls(pattern=".gcl")
 
 SillysPooled <- scan("clipboard",what='')
-GroupVec32  <- scan("clipboard",what='')
-GroupVec32  <- as.numeric(GroupVec32)
-GroupNames7 <- scan("clipboard",what='')
-Group7Colors <- scan("clipboard",what='')
+GroupVec3 <- scan("clipboard",what='')
+GroupVec3 <- as.numeric(GroupVec3)
+GroupNames3 <- scan("clipboard",what='')
+Group3Colors <- scan("clipboard",what='')
 
 PooledColSize <- sapply(paste(SillysPooled,".gcl",sep=''), function(x) get(x)$n)
 
@@ -177,4 +206,61 @@ PooledColSize <- sapply(paste(SillysPooled,".gcl",sep=''), function(x) get(x)$n)
 source("V:/Analysis/R files/Scripts/DEV/FreqFisPlot4SNPs.GCL.r")
 
 FreqFisPlot4SNPs.GCL(sillyvec=SillysPooled, loci=loci182, groupvec=GroupVec32, alpha=0.05,groupcol=NULL,file="V:/Analysis/3_AYK/Chum/WASC/Output/WASCpopfreq.pdf")
+
+
+## Convert genind to a genpop list for dist.genpop function and create distance matrix
+gcl2Genepop.GCL(sillyvec=SillysPooled,loci=loci.91,path="Genepop/YukonChum.gen",VialNums = FALSE)
+library("ape")
+genind = read.genepop(file="Genepop/YukonChum.gen")
+genpop <- genind2genpop(x=genind)
+AdegenetNei <- dist.genpop(genpop, method = 2, diag = T, upper = T)## methods 1=Nei's (1972), 2=CSE, 3=Reynold's, 4=Rogers', 5=Provesti's
+
+#####################################################################################################################
+
+NJofAdegenetNei318tree <- nj(as.matrix(AdegenetNei318))
+NJofAdegenetNei318tree$tip.label <- names131
+NJofAdegenetNei318tree$edge.length=pmax(0,NJofAdegenetNei318tree$edge.length) #Get rid of negative branches
+plot(NJofAdegenetNei318tree,font=2,cex=.3)
+axis(1)  ## Adds scale to bottom of plot
+
+
+
+#######################################################################################################################
+SillysPooled <- scan("clipboard",what='')
+GroupVec3 <- scan("clipboard",what='')
+GroupVec3 <- as.numeric(GroupVec3)
+GroupNames3 <- scan("clipboard",what='')
+Group3Colors <- scan("clipboard",what='')
+
+WAK_Likelihood_Profile <- LeaveOneOutDist.GCL(sillyvec=WAKPop60, loci=loci.319[-c(305)], groupvec=GroupVec60)
+
+WAK_Confusion <- ConfusionMatrices.GCL(LeaveOneOutDist=WAK_Likelihood_Profile, groupnames=GroupNames60, groupvec=GroupVec60, sillyvec=WAKPop60)
+
+sapply(rownames(WAK_Confusion[[1]]), function(row) {barplot(height = WAK_Confusion[[1]][row, ], col = WAKColors, main = row, ylim = c(0, 1))})
+
+
+############## Multi Dimensional Scaling (MDS) Plots:
+####These are from AYK juvenile work. 
+
+
+####### Create MDS Plots ##############
+
+
+
+x=as.vector(cmdscale(as.matrix(AdegenetNei)[1:45,1:45],k=3)[,1])   
+y=as.vector(cmdscale(as.matrix(AdegenetNei)[1:45,1:45],k=3)[,2])
+z=as.vector(cmdscale(as.matrix(AdegenetNei)[1:45,1:45],k=3)[,3])
+
+library('rgl')
+
+plot3d(x,y,z+abs(range(z)[1]),xlab='',ylab='',zlab='',aspect=F,col=Group3Colors,size=.75,type='s',box=T,axes=F,top=T,cex=4)
+plot3d(x,y,z+abs(range(z)[1]),aspect=F,col="Black",size=100,type='h',box=T,axes=T,top=F,add=T) #adds pins to spheres
+axes3d(edges="bbox",'x-')
+texts3d(x,y,z+abs(range(z)[1]),adj=c(1.2,-.5),text=labels,font=2,cex=.6,add=T,top=T,axes=F)#adds numbers to points(adj moves the numbers around the points)
+rgl.snapshot(filename="MDS/NeiYukonchum.png",fmt="png",top=TRUE)  #this saves a snapshot view of your MDS plot
+
+
+labels= scan('clipboard',what='')
+
+
 
